@@ -26,9 +26,9 @@ A Python utility that fits six parametric distributions to a 1-D sample of obser
 
 | Package | Tested version |
 |---------|---------------|
-| Python  | ≥ 3.10        |
-| NumPy   | ≥ 1.24        |
-| SciPy   | ≥ 1.11        |
+| Python  | >= 3.10        |
+| NumPy   | >= 1.24        |
+| SciPy   | >= 1.11        |
 
 ## Installation
 
@@ -36,7 +36,7 @@ A Python utility that fits six parametric distributions to a 1-D sample of obser
 pip install numpy scipy
 ```
 
-No additional setup is required — `fit_dists.py` is a single self-contained module.
+No additional setup is required -- `fit_dists.py` is a single self-contained module.
 
 ---
 
@@ -69,20 +69,20 @@ Six distributions are fitted using **maximum likelihood estimation (MLE)** via `
 |---|---|---|---|
 | Normal | `mu`, `sigma` | `norm.fit` | None |
 | Uniform | `a` (min), `b` (max) | `uniform.fit` | None |
-| Exponential | `loc`, `scale` (= 1/λ), `lambda` | `expon.fit` | None (loc fixed to sample min) |
+| Exponential | `loc`, `scale` (= 1/lambda), `lambda` | `expon.fit` | None (loc fixed to sample min) |
 | Triangular | `a` (min), `b` (max), `c` (mode) | `triang.fit` | None |
 | Weibull | `k` (shape), `lambda` (scale) | `weibull_min.fit` | **Strictly positive** (`x > 0`) |
 | Lognormal | `mu_ln`, `sigma_ln` | `lognorm.fit` | **Strictly positive** (`x > 0`) |
 
 ### Parameter notes
 
-**Exponential** — SciPy's `expon` is a shifted exponential `CDF = 1 − exp(−(x − loc) / scale)`. `loc` is fixed to the sample minimum so that the support matches the data range. The Simio expression uses only `scale` (= mean inter-arrival time), which corresponds to `Random.Exponential(scale)`.
+**Exponential** -- SciPy's `expon` is a shifted exponential `CDF = 1 - exp(-(x - loc) / scale)`. `loc` is fixed to the sample minimum so that the support matches the data range. The Simio expression uses only `scale` (= mean inter-arrival time), which corresponds to `Random.Exponential(scale)`.
 
-**Triangular** — SciPy uses an internal shape parameter `c ∈ (0, 1)` where `mode = loc + c × scale`. The reported parameters are converted to the more intuitive (`a`, `b`, `c`) = (min, max, mode) form before display and before generating the Simio expression.
+**Triangular** -- SciPy uses an internal shape parameter `c in (0, 1)` where `mode = loc + c * scale`. The reported parameters are converted to the more intuitive (`a`, `b`, `c`) = (min, max, mode) form before display and before generating the Simio expression.
 
-**Weibull** — `loc` is fixed to 0 (standard 2-parameter form). Fitting will fail gracefully if any value is ≤ 0.
+**Weibull** -- `loc` is fixed to 0 (standard 2-parameter form). Fitting will fail gracefully if any value is <= 0.
 
-**Lognormal** — `loc` is fixed to 0 and MLE is performed on the log-transformed data. `mu_ln` and `sigma_ln` are the mean and standard deviation of the underlying normal distribution. Fitting will fail gracefully if any value is ≤ 0.
+**Lognormal** -- `loc` is fixed to 0 and MLE is performed on the log-transformed data. `mu_ln` and `sigma_ln` are the mean and standard deviation of the underlying normal distribution. Fitting will fail gracefully if any value is <= 0.
 
 ---
 
@@ -95,7 +95,7 @@ The **Kolmogorov-Smirnov (KS) test** is used for all distributions via `scipy.st
 | `ks_statistic` | Maximum absolute deviation between empirical and fitted CDF |
 | `p_value` | Probability of observing a deviation this large under the null hypothesis (data follows the fitted distribution) |
 
-A `p_value ≥ 0.05` means there is insufficient evidence at the 5% level to reject the fit — the result is labelled **`[good fit]`** in the printed report. A `p_value < 0.05` is labelled **`[poor fit]`**.
+A `p_value >= 0.05` means there is insufficient evidence at the 5% level to reject the fit -- the result is labelled **`[good fit]`** in the printed report. A `p_value < 0.05` is labelled **`[poor fit]`**.
 
 > **Important:** The KS test becomes more sensitive as sample size grows. With very large samples (n > 1000), even small, practically insignificant deviations can yield low p-values. Use engineering judgment alongside the statistical result.
 
@@ -138,10 +138,10 @@ Fit all six distributions to `data` and return a `FitReport`.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `data` | `list[float]` or `np.ndarray` | — | 1-D array-like of observations. Must have ≥ 3 finite values. |
+| `data` | `list[float]` or `np.ndarray` | -- | 1-D array-like of observations. Must have >= 3 finite values. |
 | `verbose` | `bool` | `True` | If `True`, print the formatted report to stdout. |
 
-**Returns** — `FitReport`
+**Returns** -- `FitReport`
 
 **Raises**
 
@@ -264,7 +264,7 @@ All statistics are computed over the raw input data before any fitting.
 
 ## Notes and Limitations
 
-- **KS test validity** — The KS p-values are computed using the MLE-fitted parameters rather than known true parameters, which makes the test slightly anti-conservative (p-values tend to be somewhat inflated). For rigorous testing consider a parametric bootstrap.
+- **KS test validity** -- The KS p-values are computed using the MLE-fitted parameters rather than known true parameters, which makes the test slightly anti-conservative (p-values tend to be somewhat inflated). For rigorous testing consider a parametric bootstrap.
 - **Weibull and Lognormal** require strictly positive data (`x > 0`). Passing data with zeros or negative values will produce a `FitResult` with `success=False` for those distributions; the remaining distributions will still be fitted normally.
-- **Exponential `loc`** — Fixing `loc` to the sample minimum means the fitted distribution has its support starting at `min(data)`, not at zero. The Simio `Random.Exponential(scale)` expression assumes a zero-shifted exponential; if your model requires the shift, add it manually (e.g. `{loc} + Random.Exponential({scale})`).
-- **SciPy warnings** — Optimizer convergence warnings from SciPy are suppressed internally. If a fit fails silently, check `FitResult.success` and `FitResult.error`.
+- **Exponential `loc`** -- Fixing `loc` to the sample minimum means the fitted distribution has its support starting at `min(data)`, not at zero. The Simio `Random.Exponential(scale)` expression assumes a zero-shifted exponential; if your model requires the shift, add it manually (e.g. `{loc} + Random.Exponential({scale})`).
+- **SciPy warnings** -- Optimizer convergence warnings from SciPy are suppressed internally. If a fit fails silently, check `FitResult.success` and `FitResult.error`.
