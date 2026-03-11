@@ -10,6 +10,7 @@ Distributions fitted
   uniform     - U(loc, loc+scale)
   exponential - Exp(loc, scale=1/lambda)
   triangular  - Tri(c, loc, scale)   [c is the shape: mode=(loc + c*scale)]
+  weibull     - Weibull(k, lambda)   [k=shape, lambda=scale, loc fixed at 0]
   lognormal   - LogN(s, loc, scale)  [s=sigma of the underlying normal]
 
 Goodness-of-fit
@@ -179,6 +180,39 @@ def _fit_triangular(data: np.ndarray) -> FitResult:
         )
 
 
+def _fit_weibull(data: np.ndarray) -> FitResult:
+    # scipy's weibull_min: CDF = 1 - exp(-((x-loc)/scale)^c)
+    # where c=shape (k), scale=lambda. Fix loc=0 for the standard 2-param form.
+    if np.any(data <= 0):
+        return FitResult(
+            distribution="weibull",
+            params={},
+            ks_statistic=float("nan"),
+            p_value=float("nan"),
+            success=False,
+            error="weibull requires strictly positive data",
+        )
+    try:
+        c, loc, scale = stats.weibull_min.fit(data, floc=0)
+        ks, p = stats.kstest(data, "weibull_min", args=(c, loc, scale))
+        return FitResult(
+            distribution="weibull",
+            params={"k (shape)": c, "lambda (scale)": scale, "loc": loc},
+            ks_statistic=ks,
+            p_value=p,
+            success=True,
+        )
+    except Exception as exc:
+        return FitResult(
+            distribution="weibull",
+            params={},
+            ks_statistic=float("nan"),
+            p_value=float("nan"),
+            success=False,
+            error=str(exc),
+        )
+
+
 def _fit_lognormal(data: np.ndarray) -> FitResult:
     if np.any(data <= 0):
         return FitResult(
@@ -251,6 +285,7 @@ def fit_dists(
         _fit_uniform,
         _fit_exponential,
         _fit_triangular,
+        _fit_weibull,
         _fit_lognormal,
     ]
 
