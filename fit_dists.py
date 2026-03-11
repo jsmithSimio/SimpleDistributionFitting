@@ -72,6 +72,7 @@ class FitResult:
     p_value: float
     success: bool
     error: str | None = None
+    simio_expression: str | None = None
 
     def __str__(self) -> str:
         if not self.success:
@@ -79,11 +80,14 @@ class FitResult:
                 f"  {self.distribution:<14}: FIT FAILED - {self.error}"
             )
         param_str = ",  ".join(f"{k}={v:.6g}" for k, v in self.params.items())
-        return (
-            f"  {self.distribution:<14}: {param_str}\n"
-            f"  {'':14}  KS={self.ks_statistic:.4f},  p={self.p_value:.4f}"
-            + ("  [good fit]" if self.p_value >= 0.05 else "  [poor fit]")
-        )
+        gof = "  [good fit]" if self.p_value >= 0.05 else "  [poor fit]"
+        lines = [
+            f"  {self.distribution:<14}: {param_str}",
+            f"  {'':14}  KS={self.ks_statistic:.4f},  p={self.p_value:.4f}{gof}",
+        ]
+        if self.simio_expression is not None:
+            lines.append(f"  {'':14}  Simio: {self.simio_expression}")
+        return "\n".join(lines)
 
 
 @dataclass
@@ -127,18 +131,21 @@ def _fit_normal(data: np.ndarray) -> FitResult:
         ks_statistic=ks,
         p_value=p,
         success=True,
+        simio_expression=f"Random.Normal({mu:.6g}, {sigma:.6g})",
     )
 
 
 def _fit_uniform(data: np.ndarray) -> FitResult:
     loc, scale = stats.uniform.fit(data)
+    a, b = loc, loc + scale
     ks, p = stats.kstest(data, "uniform", args=(loc, scale))
     return FitResult(
         distribution="uniform",
-        params={"a (loc)": loc, "b (loc+scale)": loc + scale},
+        params={"a (loc)": a, "b (loc+scale)": b},
         ks_statistic=ks,
         p_value=p,
         success=True,
+        simio_expression=f"Random.Uniform({a:.6g}, {b:.6g})",
     )
 
 
@@ -153,6 +160,7 @@ def _fit_exponential(data: np.ndarray) -> FitResult:
         ks_statistic=ks,
         p_value=p,
         success=True,
+        simio_expression=f"Random.Exponential({scale:.6g})",
     )
 
 
@@ -168,6 +176,7 @@ def _fit_triangular(data: np.ndarray) -> FitResult:
             ks_statistic=ks,
             p_value=p,
             success=True,
+            simio_expression=f"Random.Triangular({loc:.6g}, {mode:.6g}, {loc + scale:.6g})",
         )
     except Exception as exc:
         return FitResult(
@@ -201,6 +210,7 @@ def _fit_weibull(data: np.ndarray) -> FitResult:
             ks_statistic=ks,
             p_value=p,
             success=True,
+            simio_expression=f"Random.Weibull({c:.6g}, {scale:.6g})",
         )
     except Exception as exc:
         return FitResult(
@@ -234,6 +244,7 @@ def _fit_lognormal(data: np.ndarray) -> FitResult:
             ks_statistic=ks,
             p_value=p,
             success=True,
+            simio_expression=f"Random.Lognormal({mu_ln:.6g}, {sigma_ln:.6g})",
         )
     except Exception as exc:
         return FitResult(
