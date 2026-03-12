@@ -99,7 +99,7 @@ class FitReport:
         sep = "-" * 63
         lines = [sep, str(self.descriptive), sep, "-- Distribution Fits ------------------------------------------"]
         for fr in self.fits:
-            lines.append(str(fr))
+            lines.append("\n" + str(fr))
         lines.append(sep)
         return "\n".join(lines)
 
