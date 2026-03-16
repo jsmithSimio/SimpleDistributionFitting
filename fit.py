@@ -14,5 +14,6 @@ if __name__ == "__main__":
     df = pd.read_csv(args.csv_file, skipinitialspace=True)
     print(df.head())
     data = df[args.column].to_numpy(dtype=float)
+    print(f"\nFitting column {args.column}:")
     report = fit_dists(data, verbose=False)
     print(report)
