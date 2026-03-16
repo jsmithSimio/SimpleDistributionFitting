@@ -43,8 +43,8 @@ def verify_params(mu: float, sigma: float) -> tuple[float, float]:
 
 
 def main():
-    mean = 100.0
-    std = 15.0
+    mean = 20.0
+    std = 10.0
 
     mu, sigma = lognormal_params_from_moments(mean, std)
 
