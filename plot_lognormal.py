@@ -25,9 +25,30 @@ import argparse
 import sys
 
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.stats import lognorm
+
+
+def _ensure_interactive_backend() -> bool:
+    """
+    Switch to an interactive backend if the current one is non-interactive (e.g. Agg).
+    Tries TkAgg, QtAgg, and Qt5Agg in order.  Returns True if an interactive backend
+    is active after the call, False if we are stuck with a non-interactive one.
+    """
+    if matplotlib.get_backend().lower() != "agg":
+        return True  # already interactive
+
+    for backend in ("TkAgg", "QtAgg", "Qt5Agg"):
+        try:
+            matplotlib.use(backend)
+            plt.switch_backend(backend)
+            return True
+        except Exception:
+            continue
+
+    return False  # no interactive backend available; caller should skip plt.show()
 
 
 def build_x_range(mu: float, sigma: float, percentile: float) -> np.ndarray:
@@ -136,7 +157,14 @@ def plot_lognormal(
         fig.savefig(out, dpi=150, bbox_inches="tight")
         print(f"Plot saved to: {out}")
 
-    plt.show()
+    if _ensure_interactive_backend():
+        plt.show()
+    elif not out:
+        print(
+            "WARNING: No interactive display available and no --out file specified.\n"
+            "         Use --out <file> to save the plot (e.g. --out plot.png).",
+            file=sys.stderr,
+        )
 
 
 def parse_args() -> argparse.Namespace:
