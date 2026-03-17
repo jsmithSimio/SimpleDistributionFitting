@@ -71,6 +71,8 @@ class DistSpec:
     simio_expr: str         # informational Simio expression (not used in plot)
     x_lower_bound: float | None = None  # hard lower bound for x-axis (e.g. 0.0 for
                                         # non-negative distributions); None = use ppf(0.001)
+    x_upper_bound: float | None = None  # hard upper bound for x-axis (e.g. high for
+                                        # bounded distributions); None = use ppf(percentile)
 
     def ppf(self, q: float) -> float:
         return self.frozen.ppf(q)
@@ -113,6 +115,7 @@ def _build_uniform(args: argparse.Namespace) -> DistSpec:
         frozen=frozen,
         simio_expr=f"Random.Uniform({args.low}, {args.high})",
         x_lower_bound=args.low,
+        x_upper_bound=args.high,
     )
 
 
@@ -143,6 +146,7 @@ def _build_triangular(args: argparse.Namespace) -> DistSpec:
         frozen=frozen,
         simio_expr=f"Random.Triangular({lo}, {mo}, {hi})",
         x_lower_bound=lo,
+        x_upper_bound=hi,
     )
 
 
@@ -242,9 +246,52 @@ def make_annotation(stats: dict) -> str:
 # X-range
 # ---------------------------------------------------------------------------
 
+def _right_edge(spec: DistSpec, percentile: float) -> float:
+    """
+    Return a right x-axis bound for unbounded distributions that is the larger of:
+      - ppf(percentile/100), and
+      - the point past the mode where the PDF decays to 1% of its peak value.
+
+    The second criterion prevents visually abrupt cutoffs for tight distributions
+    (e.g. high-shape Weibull) where ppf(0.995) still has meaningful density.
+    """
+    from scipy.optimize import brentq
+
+    x_pct = spec.ppf(percentile / 100.0)
+
+    # Find the mode (peak of PDF) via the median as a search starting point
+    x_mode = spec.ppf(0.50)
+    # Refine: scan a grid from x_lo to x_pct to locate the approximate peak
+    x_scan = np.linspace(spec.ppf(0.01), x_pct, 500)
+    pdf_scan = spec.pdf(x_scan)
+    x_mode = x_scan[np.argmax(pdf_scan)]
+    peak = pdf_scan.max()
+
+    threshold = peak * 0.01  # 1% of peak density
+
+    # If PDF at x_pct is already below threshold, no extension needed
+    if spec.pdf(x_pct) <= threshold:
+        return x_pct
+
+    # Search for the right x where PDF drops to threshold, beyond x_pct
+    # Upper search bound: ppf(0.9999) is safely in the far tail
+    x_far = spec.ppf(0.9999)
+    try:
+        x_decay = brentq(lambda x: spec.pdf(x) - threshold, x_pct, x_far)
+    except ValueError:
+        # brentq failed (PDF never drops below threshold in range); fall back
+        return x_far
+
+    return max(x_pct, x_decay)
+
+
 def build_x_range(spec: DistSpec, percentile: float) -> np.ndarray:
-    """Return x from the hard lower bound (or ppf(0.001)) to the given upper percentile."""
-    x_hi = spec.ppf(percentile / 100.0)
+    """Return x from the hard lower bound (or ppf(0.001)) to the hard upper bound (or ppf(percentile))."""
+    if spec.x_upper_bound is not None:
+        x_hi = spec.x_upper_bound
+    else:
+        x_hi = _right_edge(spec, percentile)
+
     if spec.x_lower_bound is not None:
         x_lo = spec.x_lower_bound
     else:
