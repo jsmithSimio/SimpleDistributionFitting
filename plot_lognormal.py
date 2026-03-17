@@ -80,11 +80,11 @@ def plot_lognormal(
 
     fig, (ax_pdf, ax_cdf) = plt.subplots(
         2, 1, figsize=(8, 7), sharex=True,
-        gridspec_kw={"hspace": 0.08}
+        constrained_layout=True,
     )
 
     title = f"Lognormal Distribution  (mu={mu}, sigma={sigma})"
-    fig.suptitle(title, fontsize=11, fontweight="bold", y=0.98)
+    fig.suptitle(title, fontsize=13, fontweight="bold")
 
     # --- PDF panel ---
     ax_pdf.plot(x, pdf, color="steelblue", linewidth=2, label="PDF")
@@ -131,8 +131,6 @@ def plot_lognormal(
     ax_cdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
     ax_cdf.legend(fontsize=8, loc="lower right")
     ax_cdf.grid(True, linestyle=":", alpha=0.5)
-
-    plt.tight_layout()
 
     if out:
         fig.savefig(out, dpi=150, bbox_inches="tight")
