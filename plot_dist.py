@@ -69,6 +69,8 @@ class DistSpec:
     name: str               # display name
     frozen: object          # frozen scipy.stats distribution
     simio_expr: str         # informational Simio expression (not used in plot)
+    x_lower_bound: float | None = None  # hard lower bound for x-axis (e.g. 0.0 for
+                                        # non-negative distributions); None = use ppf(0.001)
 
     def ppf(self, q: float) -> float:
         return self.frozen.ppf(q)
@@ -110,6 +112,7 @@ def _build_uniform(args: argparse.Namespace) -> DistSpec:
         name=f"Uniform(low={args.low}, high={args.high})",
         frozen=frozen,
         simio_expr=f"Random.Uniform({args.low}, {args.high})",
+        x_lower_bound=args.low,
     )
 
 
@@ -122,6 +125,7 @@ def _build_exponential(args: argparse.Namespace) -> DistSpec:
         name=f"Exponential(rate={args.rate})",
         frozen=frozen,
         simio_expr=f"Random.Exponential({mean})",
+        x_lower_bound=0.0,
     )
 
 
@@ -138,6 +142,7 @@ def _build_triangular(args: argparse.Namespace) -> DistSpec:
         name=f"Triangular(low={lo}, mode={mo}, high={hi})",
         frozen=frozen,
         simio_expr=f"Random.Triangular({lo}, {mo}, {hi})",
+        x_lower_bound=lo,
     )
 
 
@@ -149,6 +154,7 @@ def _build_lognormal(args: argparse.Namespace) -> DistSpec:
         name=f"Lognormal(mu={args.mu}, sigma={args.sigma})",
         frozen=frozen,
         simio_expr=f"Random.Lognormal({args.mu}, {args.sigma})",
+        x_lower_bound=0.0,
     )
 
 
@@ -163,6 +169,7 @@ def _build_weibull(args: argparse.Namespace) -> DistSpec:
         name=f"Weibull(shape={args.shape}, scale={args.scale})",
         frozen=frozen,
         simio_expr=f"Random.Weibull({args.shape}, {args.scale})",
+        x_lower_bound=0.0,
     )
 
 
@@ -236,12 +243,14 @@ def make_annotation(stats: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def build_x_range(spec: DistSpec, percentile: float) -> np.ndarray:
-    """Return x from the 0.1th percentile to the given upper percentile."""
-    x_lo = spec.ppf(0.001)
+    """Return x from the hard lower bound (or ppf(0.001)) to the given upper percentile."""
     x_hi = spec.ppf(percentile / 100.0)
-    # Guard: some distributions (uniform) have a hard lower bound at ppf(0)
-    if not np.isfinite(x_lo):
-        x_lo = spec.ppf(0.0)
+    if spec.x_lower_bound is not None:
+        x_lo = spec.x_lower_bound
+    else:
+        x_lo = spec.ppf(0.001)
+        if not np.isfinite(x_lo):
+            x_lo = spec.ppf(0.0)
     return np.linspace(x_lo, x_hi, 2000)
 
 
@@ -286,7 +295,7 @@ def plot_dist(
 
     ax_pdf.set_ylabel("Probability Density", fontsize=10)
     ax_pdf.legend(fontsize=8, loc="upper right")
-    ax_pdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.4g"))
+    ax_pdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
     ax_pdf.grid(True, linestyle=":", alpha=0.5)
 
     if show_annotation:
