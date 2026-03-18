@@ -2,3 +2,6 @@ numpy
 pandas
 matplotlib
 scipy
+# If on linux, uncomment the following line
+# python3-tk
+
