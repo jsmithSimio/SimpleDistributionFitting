@@ -330,7 +330,7 @@ def plot_dist(
     fs_title  = round(13   * scale, 1)
     fs_label  = round(10   * scale, 1)
     fs_legend = round(8    * scale, 1)
-    fs_annot  = round(7.5  * scale, 1)
+    fs_annot  = round(8  * scale, 1)
     lw_curve  = round(2    * scale, 2)
     lw_ref    = round(1.4  * scale, 2)
     lw_half   = round(1.0  * scale, 2)
