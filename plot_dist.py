@@ -335,10 +335,20 @@ def plot_dist(
     lw_ref    = round(1.4  * scale, 2)
     lw_half   = round(1.0  * scale, 2)
 
-    fig, (ax_pdf, ax_cdf) = plt.subplots(
-        2, 1, figsize=figsize, sharex=True,
+    show_pdf = not args.cdf_only
+    show_cdf = not args.pdf_only
+    n_panels = show_pdf + show_cdf
+
+    fig, axes = plt.subplots(
+        n_panels, 1, figsize=figsize,
+        sharex=(n_panels > 1),
         constrained_layout=True,
     )
+    # Normalise to a list regardless of whether subplots returns an Axes or ndarray
+    axes = [axes] if n_panels == 1 else list(axes)
+    ax_pdf = axes[0]              if show_pdf else None
+    ax_cdf = axes[-1]             if show_cdf else None
+
     fig.suptitle(spec.name, fontsize=fs_title, fontweight="bold")
 
     # Reference lines: mean (always), median (always), mode (if defined)
@@ -350,46 +360,52 @@ def plot_dist(
         ref_lines.append(("Mode", st["mode"], "seagreen", ":"))
 
     # --- PDF panel ---
-    ax_pdf.plot(x, pdf, color="steelblue", linewidth=lw_curve, label="PDF")
-    ax_pdf.fill_between(x, pdf, alpha=0.15, color="steelblue")
+    if show_pdf:
+        ax_pdf.plot(x, pdf, color="steelblue", linewidth=lw_curve, label="PDF")
+        ax_pdf.fill_between(x, pdf, alpha=0.15, color="steelblue")
 
-    if show_reflines:
-        for label, val, color, ls in ref_lines:
-            ax_pdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref,
-                           label=f"{label} = {val:.4g}")
+        if show_reflines:
+            for label, val, color, ls in ref_lines:
+                ax_pdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref,
+                               label=f"{label} = {val:.4g}")
 
-    ax_pdf.set_ylabel("Probability Density", fontsize=fs_label)
-    ax_pdf.legend(fontsize=fs_legend, loc="upper right")
-    ax_pdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
-    ax_pdf.tick_params(axis="both", labelsize=fs_legend)
-    ax_pdf.grid(True, linestyle=":", alpha=0.5)
+        ax_pdf.set_ylabel("Probability Density", fontsize=fs_label)
+        ax_pdf.legend(fontsize=fs_legend, loc="upper right")
+        ax_pdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+        ax_pdf.tick_params(axis="both", labelsize=fs_legend)
+        ax_pdf.grid(True, linestyle=":", alpha=0.5)
 
-    if show_annotation:
-        ann_text = make_annotation(st)
-        ax_pdf.text(
-            0.02, 0.97, ann_text,
-            transform=ax_pdf.transAxes,
-            fontsize=fs_annot, verticalalignment="top",
-            fontfamily="monospace",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow",
-                      alpha=0.8, edgecolor="gray"),
-        )
+        # x-axis label goes on the PDF panel only when the CDF is hidden
+        if not show_cdf:
+            ax_pdf.set_xlabel("x", fontsize=fs_label)
+
+        if show_annotation:
+            ann_text = make_annotation(st)
+            ax_pdf.text(
+                0.02, 0.97, ann_text,
+                transform=ax_pdf.transAxes,
+                fontsize=fs_annot, verticalalignment="top",
+                fontfamily="monospace",
+                bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow",
+                          alpha=0.8, edgecolor="gray"),
+            )
 
     # --- CDF panel ---
-    ax_cdf.plot(x, cdf, color="darkorchid", linewidth=lw_curve, label="CDF")
+    if show_cdf:
+        ax_cdf.plot(x, cdf, color="darkorchid", linewidth=lw_curve, label="CDF")
 
-    if show_reflines:
-        for label, val, color, ls in ref_lines:
-            ax_cdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref)
+        if show_reflines:
+            for label, val, color, ls in ref_lines:
+                ax_cdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref)
 
-    ax_cdf.axhline(0.5, color="gray", linestyle=":", linewidth=lw_half, label="CDF = 0.50")
-    ax_cdf.set_ylabel("Cumulative Probability", fontsize=fs_label)
-    ax_cdf.set_xlabel("x", fontsize=fs_label)
-    ax_cdf.set_ylim(0, 1.05)
-    ax_cdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
-    ax_cdf.tick_params(axis="both", labelsize=fs_legend)
-    ax_cdf.legend(fontsize=fs_legend, loc="lower right")
-    ax_cdf.grid(True, linestyle=":", alpha=0.5)
+        ax_cdf.axhline(0.5, color="gray", linestyle=":", linewidth=lw_half, label="CDF = 0.50")
+        ax_cdf.set_ylabel("Cumulative Probability", fontsize=fs_label)
+        ax_cdf.set_xlabel("x", fontsize=fs_label)
+        ax_cdf.set_ylim(0, 1.05)
+        ax_cdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+        ax_cdf.tick_params(axis="both", labelsize=fs_legend)
+        ax_cdf.legend(fontsize=fs_legend, loc="lower right")
+        ax_cdf.grid(True, linestyle=":", alpha=0.5)
 
     if args.out:
         fig.savefig(args.out, dpi=dpi, bbox_inches="tight")
@@ -488,12 +504,19 @@ def parse_args() -> argparse.Namespace:
                         help="Suppress mean/median/mode vertical reference lines.")
     g_plot.add_argument("--no-annotation", action="store_true",
                         help="Suppress the stats call-out box on the PDF panel.")
+    g_plot.add_argument("--pdf-only", action="store_true",
+                        help="Show only the PDF panel (mutually exclusive with --cdf-only).")
+    g_plot.add_argument("--cdf-only", action="store_true",
+                        help="Show only the CDF panel (mutually exclusive with --pdf-only).")
 
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.pdf_only and args.cdf_only:
+        _die("--pdf-only and --cdf-only are mutually exclusive.")
 
     # Shared validation
     if not (50.0 < args.percentile < 100.0):
