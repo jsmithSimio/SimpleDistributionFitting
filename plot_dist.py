@@ -317,11 +317,29 @@ def plot_dist(
     cdf  = spec.cdf(x)
     st   = compute_stats(dist_key, args, spec)
 
+    dpi = args.dpi
+    w_px = args.width  if args.width  is not None else 1200
+    h_px = args.height if args.height is not None else 1050
+    figsize = (w_px / dpi, h_px / dpi)
+
+    # Scale fonts and line widths relative to the default figure size (1200x1050).
+    # Use the geometric mean of the width and height scale factors so that
+    # non-proportional resizes (e.g. wider but not taller) split the difference.
+    _DEFAULT_W, _DEFAULT_H = 1200, 1050
+    scale = (w_px / _DEFAULT_W * h_px / _DEFAULT_H) ** 0.5
+    fs_title  = round(13   * scale, 1)
+    fs_label  = round(10   * scale, 1)
+    fs_legend = round(8    * scale, 1)
+    fs_annot  = round(7.5  * scale, 1)
+    lw_curve  = round(2    * scale, 2)
+    lw_ref    = round(1.4  * scale, 2)
+    lw_half   = round(1.0  * scale, 2)
+
     fig, (ax_pdf, ax_cdf) = plt.subplots(
-        2, 1, figsize=(8, 7), sharex=True,
+        2, 1, figsize=figsize, sharex=True,
         constrained_layout=True,
     )
-    fig.suptitle(spec.name, fontsize=13, fontweight="bold")
+    fig.suptitle(spec.name, fontsize=fs_title, fontweight="bold")
 
     # Reference lines: mean (always), median (always), mode (if defined)
     ref_lines = [
@@ -332,17 +350,18 @@ def plot_dist(
         ref_lines.append(("Mode", st["mode"], "seagreen", ":"))
 
     # --- PDF panel ---
-    ax_pdf.plot(x, pdf, color="steelblue", linewidth=2, label="PDF")
+    ax_pdf.plot(x, pdf, color="steelblue", linewidth=lw_curve, label="PDF")
     ax_pdf.fill_between(x, pdf, alpha=0.15, color="steelblue")
 
     if show_reflines:
         for label, val, color, ls in ref_lines:
-            ax_pdf.axvline(val, color=color, linestyle=ls, linewidth=1.4,
+            ax_pdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref,
                            label=f"{label} = {val:.4g}")
 
-    ax_pdf.set_ylabel("Probability Density", fontsize=10)
-    ax_pdf.legend(fontsize=8, loc="upper right")
+    ax_pdf.set_ylabel("Probability Density", fontsize=fs_label)
+    ax_pdf.legend(fontsize=fs_legend, loc="upper right")
     ax_pdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
+    ax_pdf.tick_params(axis="both", labelsize=fs_legend)
     ax_pdf.grid(True, linestyle=":", alpha=0.5)
 
     if show_annotation:
@@ -350,30 +369,31 @@ def plot_dist(
         ax_pdf.text(
             0.02, 0.97, ann_text,
             transform=ax_pdf.transAxes,
-            fontsize=7.5, verticalalignment="top",
+            fontsize=fs_annot, verticalalignment="top",
             fontfamily="monospace",
             bbox=dict(boxstyle="round,pad=0.4", facecolor="lightyellow",
                       alpha=0.8, edgecolor="gray"),
         )
 
     # --- CDF panel ---
-    ax_cdf.plot(x, cdf, color="darkorchid", linewidth=2, label="CDF")
+    ax_cdf.plot(x, cdf, color="darkorchid", linewidth=lw_curve, label="CDF")
 
     if show_reflines:
         for label, val, color, ls in ref_lines:
-            ax_cdf.axvline(val, color=color, linestyle=ls, linewidth=1.4)
+            ax_cdf.axvline(val, color=color, linestyle=ls, linewidth=lw_ref)
 
-    ax_cdf.axhline(0.5, color="gray", linestyle=":", linewidth=1.0, label="CDF = 0.50")
-    ax_cdf.set_ylabel("Cumulative Probability", fontsize=10)
-    ax_cdf.set_xlabel("x", fontsize=10)
+    ax_cdf.axhline(0.5, color="gray", linestyle=":", linewidth=lw_half, label="CDF = 0.50")
+    ax_cdf.set_ylabel("Cumulative Probability", fontsize=fs_label)
+    ax_cdf.set_xlabel("x", fontsize=fs_label)
     ax_cdf.set_ylim(0, 1.05)
     ax_cdf.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.2f"))
-    ax_cdf.legend(fontsize=8, loc="lower right")
+    ax_cdf.tick_params(axis="both", labelsize=fs_legend)
+    ax_cdf.legend(fontsize=fs_legend, loc="lower right")
     ax_cdf.grid(True, linestyle=":", alpha=0.5)
 
     if args.out:
-        fig.savefig(args.out, dpi=150, bbox_inches="tight")
-        print(f"Plot saved to: {args.out}")
+        fig.savefig(args.out, dpi=dpi, bbox_inches="tight")
+        print(f"Plot saved to: {args.out}  ({w_px}x{h_px} px at {dpi} dpi)")
 
     if _ensure_interactive_backend():
         plt.show()
@@ -458,6 +478,12 @@ def parse_args() -> argparse.Namespace:
                         help="Upper x-axis cutoff as a CDF percentile; must be in (50, 100).")
     g_plot.add_argument("--out", type=str, default=None,
                         help="Optional output file path (e.g. plot.png, plot.pdf).")
+    g_plot.add_argument("--width",  type=int, default=None,
+                        help="Output image width in pixels (requires --out). Default: 1200.")
+    g_plot.add_argument("--height", type=int, default=None,
+                        help="Output image height in pixels (requires --out). Default: 1050.")
+    g_plot.add_argument("--dpi",    type=int, default=150,
+                        help="Resolution in dots per inch for the saved file. (default: 150)")
     g_plot.add_argument("--no-reflines",   action="store_true",
                         help="Suppress mean/median/mode vertical reference lines.")
     g_plot.add_argument("--no-annotation", action="store_true",
