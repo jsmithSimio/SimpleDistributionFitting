@@ -18,6 +18,16 @@ Goodness-of-fit
   Kolmogorov-Smirnov (KS) test is used for all distributions.
   p-value > 0.05 -> insufficient evidence to reject the fit at the 5 % level.
 
+Location shift
+--------------
+  The optional loc_shift parameter subtracts a known minimum threshold from
+  every observation before fitting.  A positive value shifts the data left
+  (use when the distribution has a known non-zero minimum).  Descriptive
+  statistics and fit parameters reflect the shifted data; Simio expressions
+  include the shift as an additive constant so they remain valid in the
+  original scale.  Run once with loc_shift=0 and once with loc_shift=x to
+  compare fits with and without the shift.
+
 Dependencies
 ------------
   numpy, scipy  (both ship with most scientific Python environments)
@@ -47,10 +57,18 @@ class DescriptiveStats:
     kurtosis: float     # excess kurtosis
     minimum: float
     maximum: float
+    loc_shift: float = 0.0  # shift subtracted before fitting; 0 means no shift
 
     def __str__(self) -> str:
+        if self.loc_shift != 0.0:
+            header = (
+                f"-- Descriptive Statistics (data shifted by {-self.loc_shift:.6g})"
+                f" ----"
+            )
+        else:
+            header = "-- Descriptive Statistics -------------------------------------"
         lines = [
-            "-- Descriptive Statistics -------------------------------------",
+            header,
             f"  n          : {self.n}",
             f"  mean       : {self.mean:.6g}",
             f"  std (s)    : {self.std:.6g}",
@@ -108,7 +126,7 @@ class FitReport:
 # Core fitting logic
 # ---------------------------------------------------------------------------
 
-def _compute_descriptive(data: np.ndarray) -> DescriptiveStats:
+def _compute_descriptive(data: np.ndarray, loc_shift: float = 0.0) -> DescriptiveStats:
     return DescriptiveStats(
         n=len(data),
         mean=float(np.mean(data)),
@@ -119,6 +137,7 @@ def _compute_descriptive(data: np.ndarray) -> DescriptiveStats:
         kurtosis=float(stats.kurtosis(data, bias=False)),  # excess
         minimum=float(np.min(data)),
         maximum=float(np.max(data)),
+        loc_shift=loc_shift,
     )
 
 
@@ -265,9 +284,10 @@ def fit_dists(
     data: list[float] | np.ndarray,
     *,
     verbose: bool = True,
+    loc_shift: float = 0.0,
 ) -> FitReport:
     """
-    Fit five parametric distributions to *data* and return a FitReport.
+    Fit six parametric distributions to *data* and return a FitReport.
 
     Parameters
     ----------
@@ -275,6 +295,22 @@ def fit_dists(
         The observations to fit (must contain at least 3 values).
     verbose : bool, default True
         If True, print the formatted report to stdout.
+    loc_shift : float, default 0.0
+        A known minimum threshold to subtract from every observation before
+        fitting.  A positive value shifts the data left; use when the
+        distribution is known to have a non-zero minimum (e.g., a process
+        with a guaranteed minimum service time).
+
+        Descriptive statistics and fitted parameters reflect the shifted data.
+        Simio expressions restore the shift as an additive constant so that
+        they remain correct in the original scale.
+
+        Weibull and lognormal require strictly positive values after
+        subtraction; a ValueError is raised if loc_shift >= min(data).
+
+        To compare fits with and without a shift, call fit_dists twice:
+            report0 = fit_dists(data, loc_shift=0)
+            report1 = fit_dists(data, loc_shift=x)
 
     Returns
     -------
@@ -289,7 +325,18 @@ def fit_dists(
     if not np.all(np.isfinite(arr)):
         raise ValueError("data contains NaN or infinite values.")
 
-    descriptive = _compute_descriptive(arr)
+    if loc_shift != 0.0:
+        fit_arr = arr - loc_shift
+        if np.any(fit_arr <= 0):
+            raise ValueError(
+                f"loc_shift={loc_shift:.6g} leaves non-positive values after "
+                "subtraction. loc_shift must be strictly less than min(data)="
+                f"{float(np.min(arr)):.6g}."
+            )
+    else:
+        fit_arr = arr
+
+    descriptive = _compute_descriptive(fit_arr, loc_shift=loc_shift)
 
     fitters = [
         _fit_normal,
@@ -304,7 +351,16 @@ def fit_dists(
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for fitter in fitters:
-            fits.append(fitter(arr))
+            fits.append(fitter(fit_arr))
+
+    # Restore loc_shift in Simio expressions so they are valid in the
+    # original (unshifted) scale.
+    if loc_shift != 0.0:
+        for fr in fits:
+            if fr.success and fr.simio_expression is not None:
+                fr.simio_expression = (
+                    f"{loc_shift:.6g} + {fr.simio_expression}"
+                )
 
     report = FitReport(descriptive=descriptive, fits=fits)
 
