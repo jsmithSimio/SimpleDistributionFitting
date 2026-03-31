@@ -98,7 +98,7 @@ class FitResult:
                 f"  {self.distribution:<14}: FIT FAILED - {self.error}"
             )
         param_str = ",  ".join(f"{k}={v:.6g}" for k, v in self.params.items())
-        gof = "  [good fit]" if self.p_value >= 0.05 else "  [poor fit]"
+        gof = "  [do not reject]" if self.p_value >= 0.05 else "  [reject]"
         lines = [
             f"  {self.distribution:<14}: {param_str}",
             f"  {'':14}  KS={self.ks_statistic:.4f},  p={self.p_value:.4f}{gof}",
